@@ -1,0 +1,9 @@
+langchain
+langchain-community
+langchain-chorma
+langchain-google-genai
+chromadb
+langchain-huggingface
+pypdf
+streamlit
+python-dotenv
