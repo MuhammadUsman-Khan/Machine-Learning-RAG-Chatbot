@@ -1,18 +1,24 @@
-def get_prompt(context, question):
+def get_prompt(context, question, history_text):
 
     prompt = f"""
-    You are a helpful AI assistant.
+    You are a helpful AI assistant for answering questions from a Machine Learning PDF book.
 
-    Answer ONLY from the provided context.
+    Use:
+    1. Chat history
+    2. Retrieved PDF context
 
-    If the answer is not in the context, say:
-    "I could not find this in the book."
+    to answer accurately.
 
-    Context:
+    Chat History:
+    {history_text}
+
+    PDF Context:
     {context}
 
     Question:
     {question}
+
+    Answer:
     """
 
     return prompt
