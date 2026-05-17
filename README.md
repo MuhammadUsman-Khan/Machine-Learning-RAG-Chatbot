@@ -2,7 +2,7 @@
 
 > **Ask questions directly from a Machine Learning Book PDF using AI**
 >
-> A Retrieval-Augmented Generation (RAG) chatbot powered by **LangChain**, **ChromaDB**, **HuggingFace Embeddings**, and **Gemini LLM** with an interactive Streamlit UI.
+> A Retrieval-Augmented Generation (RAG) chatbot powered by **LangChain**, **ChromaDB**, **HuggingFace Embeddings**, **Gemini LLM**, **SQLite Chat History**, and an interactive Streamlit UI.
 
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![LangChain](https://img.shields.io/badge/LangChain-RAG%20Framework-1C3C3C?style=for-the-badge&logo=chainlink&logoColor=white)](https://www.langchain.com/)
@@ -10,6 +10,7 @@
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-7B2D8B?style=for-the-badge&logo=databricks&logoColor=white)](https://www.trychroma.com/)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Embeddings-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/)
 [![Gemini](https://img.shields.io/badge/Gemini-LLM-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![SQLite](https://img.shields.io/badge/SQLite-Chat%20History-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Status](https://img.shields.io/badge/Status-Complete-brightgreen?style=for-the-badge)](https://github.com/MuhammadUsman-Khan/Machine-Learning-RAG-Chatbot)
 
 ---
@@ -18,6 +19,7 @@
 
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-171515?style=for-the-badge&logo=github&logoColor=white)](https://github.com/MuhammadUsman-Khan/Machine-Learning-RAG-Chatbot)
 [![View Profile](https://img.shields.io/badge/GitHub-MuhammadUsman--Khan-171515?style=for-the-badge&logo=github&logoColor=white)](https://github.com/MuhammadUsman-Khan)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com)
 
 ---
 
@@ -31,6 +33,7 @@
 - [⚙️ Installation & Setup](#️-installation--setup)
 - [📖 Usage](#-usage)
 - [✨ Key Features](#-key-features)
+- [🧠 Chat Memory System](#-chat-memory-system)
 - [🚀 Future Improvements](#-future-improvements)
 - [👤 Author](#-author)
 
@@ -38,11 +41,18 @@
 
 ## 🎯 Project Overview
 
-This project implements a **Retrieval-Augmented Generation (RAG)** pipeline that lets you have an intelligent conversation with a Machine Learning Book PDF. Instead of hallucinating answers, the chatbot retrieves the most relevant passages from the document first, then feeds them to a Gemini LLM to generate grounded, accurate responses.
+This project implements a **Retrieval-Augmented Generation (RAG)** pipeline that lets users have intelligent conversations with a Machine Learning Book PDF. Instead of hallucinating answers, the chatbot retrieves the most relevant passages from the document first, then feeds them to a Gemini LLM to generate grounded and context-aware responses.
 
-**Problem**: Large language models lack knowledge of specific documents or domain PDFs.
+The application also supports:
+- Persistent vector storage using ChromaDB
+- Chat history memory using SQLite
+- Renaming chats
+- Context-aware follow-up questions
+- Streamlit chat interface
 
-**Solution**: Use RAG — embed the PDF into a vector store, retrieve relevant chunks on each query, and pass them as context to the LLM for factual, document-grounded answers.
+**Problem**: Large language models do not automatically know the content of private PDFs or books.
+
+**Solution**: Use RAG — convert PDF chunks into embeddings, retrieve relevant chunks for every query, and provide them to the LLM as factual context.
 
 ---
 
@@ -59,16 +69,18 @@ User Query
           ┌────────────┴────────────┐
           │                         │
           ▼                         ▼
-  [Process PDF Button]        [Ask Question]
+  [Process PDF]              [Ask Question]
           │                         │
           ▼                         ▼
-  pdf_loader.py            vector_store.py
-  (PyPDF → Docs)        (Load ChromaDB)
+  pdf_loader.py             vector_store.py
+  (Load & Split PDF)       (Load ChromaDB)
           │                         │
           ▼                         ▼
-  vector_store.py           rag_chain.py
-  (Embed + Store         (Retrieve → Prompt
-   in ChromaDB)            → Gemini LLM)
+  vector_store.py            rag_chain.py
+  (Embeddings + Store)   (Retrieve + Prompt + LLM)
+                                    │
+                                    ▼
+                           SQLite Chat Database
                                     │
                                     ▼
                              Answer to User
@@ -81,16 +93,22 @@ User Query
 ```
 Machine-Learning-RAG-Chatbot/
 │
+├── chroma_db/                 # Persistent Chroma vector database
+│
 ├── data/
 │   └── ML_Book.pdf            # Source PDF document
 │
 ├── utils/
+│   ├── db.py                  # SQLite database operations
 │   ├── pdf_loader.py          # Load & split PDF into chunks
-│   ├── vector_store.py        # Create & load ChromaDB vector store
-│   └── rag_chain.py           # RAG chain: retrieve + prompt + LLM
+│   ├── prompt_template.py     # Prompt template for RAG
+│   ├── rag_chain.py           # Retrieval + Gemini response generation
+│   └── vector_store.py        # ChromaDB vector store operations
 │
-├── app.py                     # Streamlit application entry point
+├── chat_history.db            # SQLite database file
+├── app.py                     # Main Streamlit application
 ├── requirements.txt           # Python dependencies
+├── .env                       # Environment variables (API keys)
 ├── .gitignore
 └── README.md
 ```
@@ -104,24 +122,35 @@ Machine-Learning-RAG-Chatbot/
 ML_Book.pdf → PyPDFLoader → Text Chunks (with overlap)
 ```
 - The PDF is loaded using `PyPDFLoader` from LangChain
-- Text is split into overlapping chunks to preserve context across page boundaries
+- Text is split into overlapping chunks using `RecursiveCharacterTextSplitter`
+- Chunk overlap preserves context between sections
 
-### Step 2: Embedding & Vector Store
+### Step 2: Embedding & Vector Storage
 ```
 Text Chunks → HuggingFace Embeddings → ChromaDB (persisted locally)
 ```
-- Each chunk is converted into a dense vector using a HuggingFace sentence-transformer model
-- Vectors are stored in ChromaDB for fast semantic retrieval
-- The store is persisted on disk — no re-processing needed on subsequent runs
+- Each text chunk is converted into dense vector embeddings
+- Embeddings are generated using HuggingFace sentence-transformers
+- ChromaDB stores vectors for semantic similarity search
+- The database persists locally, preventing repeated processing
 
 ### Step 3: Retrieval-Augmented Generation
 ```
-User Query → Similarity Search → Top-K Chunks → Gemini LLM → Answer
+User Question → Similarity Search → Relevant Chunks → Gemini LLM → Answer
 ```
-- The user's question is embedded and matched against stored vectors
-- The most semantically similar chunks are retrieved
-- A LangChain prompt template combines the retrieved context + question
-- Gemini LLM generates a grounded answer using only the retrieved context
+- User questions are embedded and matched against stored vectors
+- ChromaDB retrieves the most semantically similar chunks
+- Retrieved context is injected into the prompt via a LangChain prompt template
+- Gemini generates grounded answers from the document context
+
+### Step 4: Chat Memory System
+```
+Conversation → SQLite Database → Persistent Chat History
+```
+- All conversations are stored in SQLite via `db.py`
+- Previous messages can be used as conversational memory
+- Only recent messages are passed to the LLM for efficient context management
+- Chats can be renamed dynamically
 
 ---
 
@@ -131,8 +160,9 @@ User Query → Similarity Search → Top-K Chunks → Gemini LLM → Answer
 |-----------|-----------|---------|
 | **Framework** | LangChain | RAG pipeline orchestration |
 | **LLM** | Gemini (Google Generative AI) | Answer generation |
-| **Embeddings** | HuggingFace `sentence-transformers` | Semantic text encoding |
+| **Embeddings** | HuggingFace Sentence Transformers | Semantic text encoding |
 | **Vector Store** | ChromaDB | Similarity search & retrieval |
+| **Database** | SQLite | Chat history storage |
 | **PDF Parsing** | PyPDF | Extract text from PDF |
 | **UI** | Streamlit | Interactive web interface |
 | **Config** | python-dotenv | API key management |
@@ -192,64 +222,99 @@ On first launch, click **"Process PDF"** to:
 - Generate HuggingFace embeddings
 - Store vectors in ChromaDB (persisted locally)
 
-> ✅ You only need to do this **once**. The vector store is saved to disk.
+> ✅ If the vector database already exists, the PDF will **not** be processed again.
 
 ### Step 2 — Ask Questions
 
-Type any question related to the ML book in the text input:
+Example questions:
 
 ```
-Ask Question: What is the difference between supervised and unsupervised learning?
+What is supervised learning?
+Explain overfitting in machine learning.
+What is gradient descent?
+Difference between classification and regression?
 ```
 
-The chatbot will:
-1. Embed your question
-2. Retrieve the most relevant PDF passages
-3. Pass them to Gemini LLM as context
-4. Return a grounded, document-based answer
+### Step 3 — Continue Conversations
+
+The chatbot remembers recent conversation history, enabling follow-up questions like:
+
+```
+Can you explain that with an example?
+What are its advantages?
+```
 
 ---
 
 ## ✨ Key Features
 
-### 📄 PDF-Grounded Answers
-Responses are based strictly on retrieved document chunks — no hallucination from the LLM's generic training data.
+### 📄 PDF-Grounded Responses
+Answers are generated using retrieved document chunks rather than generic LLM knowledge.
 
 ### 🔍 Semantic Search
 HuggingFace sentence-transformer embeddings enable meaning-based retrieval, not just keyword matching.
 
-### 💾 Persistent Vector Store
-ChromaDB persists the index to disk, so the PDF is only processed once — making subsequent queries instant.
+### 💾 Persistent Vector Database
+ChromaDB persists the index to disk — PDF processing happens only once, making all subsequent queries instant.
 
-### 🧩 Modular Architecture
-The `utils/` package separates concerns cleanly:
+### 🧠 Conversation Memory
+Recent chat history is passed to the LLM for contextual follow-up questions.
+
+### 🗄️ SQLite Chat Storage
+All chats and messages are saved permanently in a lightweight SQLite database.
+
+### ✏️ Rename Chats
+Users can rename conversations dynamically inside the app.
+
+### 🌐 Interactive Streamlit UI
+Modern chatbot interface with real-time responses.
+
+### 🧩 Modular Code Structure
+Clean separation of responsibilities across the `utils/` package:
 - `pdf_loader.py` — document ingestion
 - `vector_store.py` — embedding & retrieval
 - `rag_chain.py` — LLM interaction
+- `prompt_template.py` — prompt construction
+- `db.py` — SQLite chat history operations
 
-### 🌐 Interactive UI
-Streamlit provides a simple, browser-based interface with no frontend coding required.
+---
+
+## 🧠 Chat Memory System
+
+The chatbot includes a lightweight memory system using SQLite.
+
+### Features
+- Persistent chat storage across sessions
+- Multiple saved conversations
+- Recent-history memory passed to LLM
+- Rename chats dynamically
+- Fast retrieval
+
+### Why Only Recent History?
+
+Passing the entire conversation history to the LLM increases token usage, cost, and latency. Instead, only the most recent messages are included — giving the model enough context for follow-up questions without bloating the prompt.
 
 ---
 
 ## 🚀 Future Improvements
 
 ### Short-term
-- [ ] Support uploading **any PDF** via UI (not just hardcoded path)
+- [ ] Upload any PDF directly from UI
 - [ ] Display retrieved source chunks alongside the answer
-- [ ] Add conversation memory (multi-turn chat history)
 - [ ] Stream LLM responses token-by-token
+- [ ] Add dark/light mode toggle
 
 ### Medium-term
-- [ ] Support multiple PDFs simultaneously
-- [ ] Add a reranker (cross-encoder) for more precise retrieval
-- [ ] Swap embedding models via UI dropdown
-- [ ] Evaluate retrieval quality with RAGAS framework
+- [ ] Multi-PDF support
+- [ ] Reranking with cross-encoders
+- [ ] LangSmith tracing integration
+- [ ] Hybrid search (BM25 + vectors)
 
 ### Long-term
-- [ ] Deploy to cloud (Streamlit Cloud / HuggingFace Spaces)
-- [ ] Add authentication for multi-user access
-- [ ] Extend to support other document formats (DOCX, TXT, URLs)
+- [ ] Cloud deployment (Streamlit Cloud / HuggingFace Spaces)
+- [ ] Multi-user authentication
+- [ ] OCR support for scanned PDFs
+- [ ] Voice interaction
 
 ---
 
@@ -259,9 +324,10 @@ Streamlit provides a simple, browser-based interface with no frontend coding req
 
 - 🎓 BS Artificial Intelligence Student
 - 💼 AI Engineering Intern
-- 🤖 GenAI | LLM | RAG | Machine Learning
+- 🤖 GenAI | RAG | LLMs | Machine Learning | NLP
 - 🔗 [GitHub](https://github.com/MuhammadUsman-Khan)
 - 🏆 [Kaggle](https://www.kaggle.com/muhammadusmankhan0)
+- 💼 [LinkedIn](https://www.linkedin.com)
 
 ### Connect & Collaborate
 
@@ -294,6 +360,7 @@ This project is open-source and free to use for educational and personal purpose
 [![LangChain](https://img.shields.io/badge/LangChain-RAG%20Framework-1C3C3C?style=for-the-badge&logo=chainlink&logoColor=white)](https://www.langchain.com/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Store-7B2D8B?style=for-the-badge&logo=databricks&logoColor=white)](https://www.trychroma.com/)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Embeddings-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/)
+[![SQLite](https://img.shields.io/badge/SQLite-Chat%20History-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
 
 ---
